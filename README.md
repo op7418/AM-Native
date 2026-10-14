@@ -10,7 +10,7 @@ SwiftUI + AppKit 界面，直接通过 IOKit HID 与设备通信，无需运行�
 
 ## 下载与安装
 
-**[下载最新测试版（Apple Silicon）](https://github.com/op7418/AM-Native/releases/latest)**
+**[下载最新测试版（Apple Silicon）](https://github.com/op7418/AM-Native/releases/tag/v0.4.7)**
 
 1. 下载 Release 中的 `AMNative-版本号-arm64-preview.zip` 并解压。
 2. 把 `AM Native.app` 拖入“应用程序”文件夹，双击打开。

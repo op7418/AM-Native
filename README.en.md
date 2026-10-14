@@ -10,7 +10,7 @@ Built with SwiftUI, AppKit and direct IOKit HID communication. The official sett
 
 ## Download and install
 
-**[Download the latest preview for Apple Silicon](https://github.com/op7418/AM-Native/releases/latest)**
+**[Download the latest preview for Apple Silicon](https://github.com/op7418/AM-Native/releases/tag/v0.4.7)**
 
 1. Download `AMNative-VERSION-arm64-preview.zip` from the release and unzip it.
 2. Drag `AM Native.app` into Applications and open it.
