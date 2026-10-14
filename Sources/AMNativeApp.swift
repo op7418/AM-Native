@@ -15,6 +15,44 @@ final class MouseModel: ObservableObject {
     @Published var mappingReceipt: MappingReceipt?
     @Published var mappingPending = false
     @Published var versions: [String: String] = [:]
+    @Published var lighting: LightSnapshot?
+    @Published var lightingReceipt: LightReceipt?
+    @Published var lightingPending = false
+    @Published var lightingMessage: String?
+    @Published var lightingFailed = false
+    private let lightingService = LightingService()
+    func readLighting(_ target: LightTarget) async {
+        guard !busy else { return }; busy = true; defer { busy = false }
+        lightingMessage = nil; lightingFailed = false
+        lightingPending = await lightingService.hasPending()
+        do { lighting = try await lightingService.read(target) }
+        catch { lighting = nil; lightingMessage = error.localizedDescription; lightingFailed = true }
+    }
+    func saveLighting(_ state: LightState, expected: LightSnapshot) async {
+        guard !busy else { return }; busy = true; defer { busy = false }
+        do {
+            let result = try await lightingService.apply(state,expected:expected)
+            lighting = result.after; lightingReceipt = result; lightingFailed = false
+            lightingMessage = "已保存，灯效完整读回一致。"
+        } catch { lightingMessage = error.localizedDescription; lightingFailed = true }
+        lightingPending = await lightingService.hasPending()
+    }
+    func undoLighting() async {
+        guard !busy, let receipt = lightingReceipt else { return }; busy = true; defer { busy = false }
+        do {
+            lighting = try await lightingService.undo(receipt); lightingReceipt = nil; lightingFailed = false
+            lightingMessage = "已恢复原灯效，完整读回一致。"
+        } catch { lightingMessage = error.localizedDescription; lightingFailed = true }
+        lightingPending = await lightingService.hasPending()
+    }
+    func recoverLighting() async {
+        guard !busy else { return }; busy = true; defer { busy = false }
+        do {
+            lighting = try await lightingService.recover(); lightingReceipt = nil; lightingFailed = false
+            lightingMessage = "原始灯效已恢复。"
+        } catch { lightingMessage = error.localizedDescription; lightingFailed = true }
+        lightingPending = await lightingService.hasPending()
+    }
     private var observedIdentity: UInt64?
     private let mappingService = MappingService()
     private let service = MouseService()
@@ -24,12 +62,13 @@ final class MouseModel: ObservableObject {
         defer { busy = false }
         observedIdentity = await service.connectionIdentity()
         pending = await service.hasPending()
+        lightingPending = await lightingService.hasPending()
         mappingPending = await mappingService.hasPending()
         let previousIdentity = snapshot?.deviceIdentity
         do { snapshot = try await service.read(); error = nil }
         catch { self.error = error.localizedDescription; snapshot = nil }
         if snapshot?.deviceIdentity != previousIdentity {
-            receipt = nil; mappingReceipt = nil; notice = nil; mappingNotice = nil; versions = [:]
+            receipt = nil; mappingReceipt = nil; lighting = nil; lightingReceipt = nil; notice = nil; mappingNotice = nil; versions = [:]
         }
         if snapshot != nil {
             do { mapping = try await mappingService.read(); mappingError = nil }
@@ -107,10 +146,10 @@ final class MouseModel: ObservableObject {
 }
 
 enum Page: String, CaseIterable, Identifiable {
-    case overview = "概览", buttons = "按键", pointer = "指针", device = "设备信息", updates = "更新"
+    case lighting = "光效", overview = "概览", buttons = "按键", pointer = "指针", device = "设备信息", updates = "更新"
     var id: String { rawValue }
     var icon: String {
-        switch self { case .buttons: "cursorarrow.click.2"; case .updates: "arrow.down.circle"; case .overview: "computermouse"; case .pointer: "cursorarrow.motionlines"; case .device: "info.circle" }
+        switch self { case .lighting: "lightbulb"; case .buttons: "cursorarrow.click.2"; case .updates: "arrow.down.circle"; case .overview: "computermouse"; case .pointer: "cursorarrow.motionlines"; case .device: "info.circle" }
     }
 }
 
@@ -178,6 +217,7 @@ struct RootView: View {
                             case .buttons: MappingPanel(control: selectedControl, selectControl: { selectedControl = $0 }).id(selectedControl)
                             case .pointer: PointerView()
                             case .device: DevicePanel()
+                            case .lighting: LightingPanel()
                             case .updates: UpdatePanel()
                             }
                         }.scrollContentBackground(.hidden)
@@ -187,12 +227,12 @@ struct RootView: View {
                     .background(SidebarSurface.color)
                 }
                 VStack(spacing: 0) {
-                    if model.pending || model.mappingPending {
+                    if model.pending || model.mappingPending || model.lightingPending {
                         HStack {
                             Label("有一笔配置修改等待恢复", systemImage: "arrow.uturn.backward.circle.fill").foregroundStyle(.orange)
                             Spacer()
-                            Button(model.mappingPending ? "恢复按键配置" : "恢复 DPI") {
-                                Task { if model.mappingPending { await model.recoverMapping() } else { await model.recover() } }
+                            Button(model.lightingPending ? "恢复灯效" : model.mappingPending ? "恢复按键配置" : "恢复 DPI") {
+                                Task { if model.lightingPending { await model.recoverLighting() } else if model.mappingPending { await model.recoverMapping() } else { await model.recover() } }
                             }.nativeAction(prominent: true).disabled(model.busy)
                         }.padding(16)
                     }
@@ -305,7 +345,7 @@ struct GlassPageTabs: View {
     let updateCount: Int
     var body: some View {
         HStack(spacing: 4) {
-            ForEach([Page.device, Page.updates]) { page in
+            ForEach([Page.lighting, Page.device, Page.updates]) { page in
                 MacNavigationButton(title: page == .updates && updateCount > 0 ? "更新 · \(updateCount)" : page.rawValue,
                                     symbol: page.icon, selected: selection == page,
                                     identifier: "page-\(page.id)", appearanceStyle: .capsule) { selection = page }

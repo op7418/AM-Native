@@ -10,7 +10,7 @@ Built with SwiftUI, AppKit and direct IOKit HID / CoreBluetooth communication. T
 
 ## Download and install
 
-**[Download the latest preview for Apple Silicon](https://github.com/op7418/AM-Native/releases/tag/v0.5.0)**
+**[Download the latest preview for Apple Silicon](https://github.com/op7418/AM-Native/releases/tag/v0.6.0)**
 
 1. Download `AMNative-VERSION-arm64-preview.zip` from the release and unzip it.
 2. Drag `AM Native.app` into Applications and open it.
@@ -40,6 +40,7 @@ After confirming that the download came from this repository's release, try open
 | Remap a button | Click its dot or connected label on the mouse, choose an action, then **保存到鼠标** (Save to mouse) |
 | Configure the wheel | Click the wheel, then choose click, scroll up or scroll down |
 | Adjust DPI | Click DPI at the bottom, choose a stage, adjust X/Y and save |
+| Configure lighting | **光效** (Lighting), select mouse or receiver, adjust the effect, then **保存光效** (Save lighting) |
 | Check the battery | Click **电量** (Battery) at the bottom |
 | Undo a saved change | **撤销** / **撤销映射** restores the last successful change in the current app session |
 | Check official updates | **更新** (Updates) in the top-right corner |
@@ -49,6 +50,12 @@ After confirming that the download came from this repository's release, try open
 Selecting an action does not write to the device. Saving first creates a backup, then writes the change and reads it back for verification. **Saved onboard DPI and button mappings continue to work after the app quits.** Mac shortcuts use default system key combinations; customized system shortcuts may behave differently.
 
 The black/white selector changes the illustration only. It does not detect the hardware color or change lighting. Collapse the sidebar whenever you like; clicking a mouse hotspot, DPI or battery opens the matching settings again.
+
+## Lighting and connection limits
+
+Mouse effects: Solid, Breathing and Neon, speed 1–10, up to 7 colors. The receiver itself supports Solid, Breathing, Arc, Mosaic, Aurora, Night City and Flow, with speed, brightness and effect-specific colors. Saving creates a raw backup and verifies the entire persisted animation; Undo restores the original bytes.
+
+**Bluetooth and USB support the full multicolor settings.** The 2.4 GHz mouse route has a long-reply limitation, so the app uses compact animations. Some slow multicolor breathing combinations require fewer colors, a higher speed, or Bluetooth/USB. If an existing animation is too long to read safely, the app asks you to switch connections and leaves it intact. The receiver's own seven effects are independent of this limitation and can be configured whenever it is plugged in.
 
 ## Backups, updates and troubleshooting
 
@@ -62,7 +69,7 @@ The black/white selector changes the illustration only. It does not detect the h
 
 **Background operation:** saved onboard settings do not require the app to stay open. Scheduled version checks run only while the app is running.
 
-**Not implemented:** gestures, smooth scrolling, per-app profiles, lighting controls and firmware flashing.
+**Not implemented:** gestures, smooth scrolling, per-app profiles and firmware flashing.
 
 ## Build from source
 

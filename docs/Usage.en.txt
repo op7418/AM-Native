@@ -1,4 +1,4 @@
-AM Native 0.5.0 — preview for Apple Silicon
+AM Native 0.6.0 — preview for Apple Silicon
 
 Author: 歸藏 (Guizang) · https://twitter.com/op7418
 Source and English README: https://github.com/op7418/AM-Native
@@ -9,6 +9,9 @@ Source and English README: https://github.com/op7418/AM-Native
 4. Click a mouse hotspot to remap a button. Click DPI at the bottom to change a stage. Click 保存到鼠标 (Save to mouse) to apply; choosing an option alone does not save.
 5. The app backs up before writing and verifies the result by reading it back. Saved onboard settings remain effective after quitting. 撤销 / 撤销映射 restores the previous successful change during the current app session.
 6. 更新 (Updates) checks official mouse/receiver firmware and Mac driver versions; it does not flash, download or install them. Press Command-R to refresh device status.
+
+7. 光效 (Lighting) configures the mouse or receiver. Mouse: Solid/Breathing/Neon, speed 1–10, up to 7 colors. Receiver: seven effects, speed and brightness. Save lighting applies and verifies; Undo restores the raw original animation.
+8. Bluetooth/USB support full multicolor settings. The 2.4 GHz mouse route uses compact animations because long replies can time out. Some slow multicolor breathing settings require fewer colors, higher speed or Bluetooth/USB. Existing long animations must be read over Bluetooth/USB. The receiver's own effects are unaffected.
 
 The interface is currently Chinese. The English README explains each control.
 Apple Silicon only. Declared minimum macOS 14; tested on macOS 27. Bluetooth, direct USB and 2.4 GHz have passed hardware read/write/restore tests. Bluetooth and USB also passed app save/undo checks. Other OS versions are unverified. Glass styling requires macOS 26+.

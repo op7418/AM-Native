@@ -105,7 +105,7 @@ actor MappingService {
     func hasPending() -> Bool { FileManager.default.fileExists(atPath: Self.pendingURL.path) }
     private struct Journal: Codable { let before: MappingSnapshot; let changed: KeyMapping }
     func apply(_ changed: KeyMapping, expected: MappingSnapshot) throws -> MappingReceipt {
-        guard !hasPending(), !FileManager.default.fileExists(atPath: MouseService.backupDirectory.appendingPathComponent("pending.json").path) else {
+        guard !FileManager.default.fileExists(atPath: LightingService.pendingURL.path), !hasPending(), !FileManager.default.fileExists(atPath: MouseService.backupDirectory.appendingPathComponent("pending.json").path) else {
             throw MouseError.message("先恢复未完成的配置修改，再修改按键。")
         }
         let device = try MouseDevice(), before = try device.readMappings()

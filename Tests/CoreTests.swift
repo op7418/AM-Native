@@ -45,6 +45,14 @@ struct CoreTests {
         try check(ble.append(bytes: Array(frame.prefix(5))).isEmpty)
         try check(ble.append(bytes: Array(frame.dropFirst(5))).first?.payload == payload)
         try check(ble.append(bytes: ack + ack).count == 2)
+        // A 512-byte API limit must not turn a long RACE request into ATT long writes.
+        let longRequest = (0..<636).map { UInt8($0 % 256) }
+        for limits in [(512,244),(512,20),(32,244)] {
+            let chunks = try BluetoothTransport.chunks(longRequest,withResponseLimit:limits.0,shortWriteLimit:limits.1)
+            try check(chunks.flatMap { Array($0) } == longRequest)
+            try check(chunks.allSatisfy { !$0.isEmpty && $0.count <= min(59,limits.0,limits.1) })
+        }
+        do { _=try BluetoothTransport.chunks(longRequest,withResponseLimit:0,shortWriteLimit:20);fatalError("Invalid MTU accepted") } catch {}
         func endpoint(_ vendor: Int = 3725, _ product: Int, _ transport: String = "USB", _ page: Int = 0xff13, _ size: Int = 62, _ name: String = "AM Infinity .97") -> MouseInterface {
             MouseInterface(vendorID: vendor, productID: product, productName: name, transport: transport, usagePage: page, featureSize: size)
         }

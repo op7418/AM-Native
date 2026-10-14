@@ -21,7 +21,7 @@ actor MouseService {
     func read() throws -> MouseSnapshot { try MouseDevice().snapshot() }
 
     func apply(stage: DPIStage, expected: MouseSnapshot) throws -> ChangeReceipt {
-        guard !recoveryRequired, !FileManager.default.fileExists(atPath: Self.backupDirectory.appendingPathComponent("mapping-pending.json").path), !FileManager.default.fileExists(atPath: pendingURL.path) else {
+        guard !FileManager.default.fileExists(atPath: LightingService.pendingURL.path), !recoveryRequired, !FileManager.default.fileExists(atPath: Self.backupDirectory.appendingPathComponent("mapping-pending.json").path), !FileManager.default.fileExists(atPath: pendingURL.path) else {
             throw MouseError.message("上次写入尚未确认恢复。请先使用“恢复未完成的修改”。")
         }
         let device = try MouseDevice()

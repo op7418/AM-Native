@@ -135,7 +135,7 @@ struct DevicePanel: View {
                 }
                 DisclosureGroup("支持范围") {
                     Text("支持蓝牙、USB 直连和 2.4G 接收器。蓝牙首次连接需允许系统蓝牙权限；请先在 macOS 中完成配对。")
-                    Text("支持板载按键和常用 Mac 快捷键映射。手势、平滑滚动、灯光和固件刷写尚未加入。")
+                    Text("支持板载按键和常用 Mac 快捷键映射。支持鼠标和接收器光效。手势、平滑滚动和固件刷写尚未加入。")
                 }.foregroundStyle(.secondary)
                 DisclosureGroup("图片来源") {
                     Text("外观示意来自 Angry Miao 官方设置页面，配色不代表检测结果。图片及商标归各自权利人所有，不属于本项目的 MIT 许可范围。")

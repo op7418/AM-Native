@@ -76,7 +76,7 @@ struct RaceDecoder {
                 buffer.removeFirst(); continue
             }
             let length = word(buffer, 2) + 4
-            guard length >= 6, length <= 4096 else { buffer.removeFirst(); continue }
+            guard length >= 6, length <= 16384 else { buffer.removeFirst(); continue }
             guard buffer.count >= length else { break }
             frames.append(RaceFrame(command: UInt16(word(buffer, 4)), type: buffer[1], payload: Array(buffer[6..<length])))
             buffer.removeFirst(length)
@@ -172,10 +172,11 @@ final class MouseDevice {
         return identity
     }
 
-    init() throws {
+    init(preferredConnection: MouseConnection? = nil) throws {
         let discovery = Self.discover()
         manager = discovery.0
-        let candidates = discovery.1, interfaces = discovery.2
+        let indices = discovery.2.indices.filter { preferredConnection == nil || discovery.2[$0].connection == preferredConnection }
+        let candidates = indices.map { discovery.1[$0] }, interfaces = indices.map { discovery.2[$0] }
         let index = try MouseInterface.select(interfaces), selected = candidates[index]
         connectionKind = interfaces[index].connection!
         productID = interfaces[index].productID
@@ -211,27 +212,48 @@ final class MouseDevice {
         (IOHIDDeviceGetProperty(d, key as CFString) as? NSNumber)?.intValue ?? 0
     }
 
-    func command(_ command: UInt16, payload: [UInt8] = [], routeOverride: UInt8? = nil) throws -> [UInt8] {
+    func command(_ command: UInt16, payload: [UInt8] = [], routeOverride: UInt8? = nil, waitForReply: Bool = true) throws -> [UInt8] {
         // Narrow allowlist: configuration and firmware VERSION reads only; no flashing, pairing or reset.
-        guard [0x30c5, 0x30cf, 0x30c9, 0x30c4, 0x30c7, 0x30c3, 0x30c2, 0x1c07].contains(command) else { throw MouseError.message("此版本未启用该命令") }
-        guard routeOverride == nil || (command == 0x1c07 && [UInt8(0), 0x80].contains(routeOverride!)) else { throw MouseError.message("不允许覆盖写入路由") }
+        guard [0x30c5, 0x30cf, 0x30c9, 0x30c4, 0x30c7, 0x30c3, 0x30c2, 0x1c07, 0x0a0c, 0x0a0d, 0x30b3, 0x30c0, 0x300d, 0x300e].contains(command) else { throw MouseError.message("此版本未启用该命令") }
+        guard waitForReply || [0x0a0d, 0x30b3, 0x30c0, 0x300d].contains(command) else { throw MouseError.message("此命令必须等待回复") }
+        if command == 0x0a0c {
+            guard payload.count == 4, [24586,25088].contains(word(payload,0)), (1...8192).contains(word(payload,2)) else { throw MouseError.message("仅允许读取灯效配置") }
+        }
+        if connectionKind == .receiver, routeOverride == nil {
+            if command == 0x0a0c, word(payload,2) > 128 { throw MouseError.message("接收器长动画请通过蓝牙或 USB 读取。") }
+            if command == 0x0a0d, payload.count > 130 { throw MouseError.message("接收器长动画请通过蓝牙或 USB 保存。") }
+        }
+        if command == 0x0a0d {
+            guard payload.count >= 6, word(payload,0) == 25088, payload[2] == 1,
+                  word(payload,3) == payload.count - 6, payload.count <= 8198, payload[5] > 0 else { throw MouseError.message("灯效数据无效") }
+        }
+        if command == 0x30b3 { guard payload.count == 3, payload[0] <= 1, payload[1] <= 2, (1...10).contains(payload[2]) else { throw MouseError.message("灯效参数无效") } }
+        if command == 0x30c0 { guard payload.count == 7, payload[0...3] == [128,0,16,1] else { throw MouseError.message("实时颜色参数无效") } }
+        if [0x300d,0x300e].contains(command) {
+            guard connectionKind == .receiver, routeOverride == 0, (command == 0x300e ? payload.isEmpty : payload.count == 13) else { throw MouseError.message("接收器灯效仅允许本地接收器接口") }
+        }
+        guard routeOverride == nil || (command == 0x1c07 && [UInt8(0),0x80].contains(routeOverride!)) || ([0x300d,0x300e].contains(command) && routeOverride == 0) else { throw MouseError.message("不允许覆盖写入路由") }
         let route = routeOverride ?? self.route
         let race: [UInt8] = [5, 0x5a] + littleEndian(payload.count + 2) + littleEndian(Int(command)) + payload
         if let bluetooth {
             guard routeOverride == nil || routeOverride == 0 else { throw MouseError.message("蓝牙不支持接收器路由") }
-            return try bluetooth.exchange(race, command: command, trace: trace)
+            return try bluetooth.exchange(race, command: command, trace: trace, waitForReply: waitForReply)
         }
         guard let device else { throw MouseError.message("鼠标已断开") }
-        guard race.count <= 59 else { throw MouseError.message("命令过长") }
-        var report = [UInt8(0x14), UInt8(race.count), route] + race
-        report += Array(repeating: 0, count: 62 - report.count)
-        trace?("TX " + report.map { String(format: "%02x", $0) }.joined(separator: " "))
-        let code = IOHIDDeviceSetReport(device, kIOHIDReportTypeFeature, 0x14, report, report.count)
-        guard code == kIOReturnSuccess else { throw MouseError.message(String(format: "HID 写入失败 0x%08x", code)) }
+        guard race.count <= 8204 else { throw MouseError.message("命令过长") }
+        for start in stride(from: 0, to: race.count, by: 59) {
+            let part = Array(race[start..<min(start + 59, race.count)])
+            var report = [UInt8(0x14), UInt8(part.count), route] + part
+            report += Array(repeating: 0, count: 62 - report.count)
+            trace?("TX " + report.map { String(format: "%02x", $0) }.joined(separator: " "))
+            let code = IOHIDDeviceSetReport(device, kIOHIDReportTypeFeature, 0x14, report, report.count)
+            guard code == kIOReturnSuccess else { throw MouseError.message(String(format: "HID 写入失败 0x%08x", code)) }
+            Thread.sleep(forTimeInterval: 0.002)
+        }
+        if !waitForReply { Thread.sleep(forTimeInterval: 0.12); return [] }
         var decoder = RaceDecoder()
-        let deadline = Date().addingTimeInterval(3)
+        let deadline = Date().addingTimeInterval(command == 0x0a0c ? 12 : 3)
         repeat {
-            Thread.sleep(forTimeInterval: 0.02)
             var buffer = [UInt8](repeating: 0, count: 62); buffer[0] = 0x14
             var length = buffer.count
             let code = IOHIDDeviceGetReport(device, kIOHIDReportTypeFeature, 0x14, &buffer, &length)
@@ -239,10 +261,12 @@ final class MouseDevice {
             let bytes = Array(buffer.prefix(length))
             if bytes.count > 1, bytes[1] > 0 { trace?("RX " + bytes.map { String(format: "%02x", $0) }.joined(separator: " ")) }
             for frame in try decoder.append(report: bytes, route: route) where frame.command == command {
-                guard frame.payload.first == 0 else { throw MouseError.message(String(format: "设备拒绝命令 0x%04x", command)) }
-                if command == 0x1c07 { if frame.payload.count > 1 { return frame.payload }; continue }
+                guard command == 0x300e || frame.payload.first == 0 else { throw MouseError.message(String(format: "设备拒绝命令 0x%04x", command)) }
+                if command == 0x1c07 || command == 0x0a0c { if frame.payload.count > 1 { return frame.payload }; continue }
                 return frame.payload
             }
+            // Drain fragmented animation replies promptly; pause only on empty reports.
+            Thread.sleep(forTimeInterval: bytes.count > 1 && bytes[1] > 0 ? 0.001 : 0.02)
         } while Date() < deadline
         throw MouseError.message(String(format: "读取超时 0x%04x，请唤醒鼠标并重试", command))
     }

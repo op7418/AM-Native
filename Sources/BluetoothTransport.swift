@@ -40,6 +40,8 @@ final class BluetoothTransport: NSObject, CBCentralManagerDelegate, CBPeripheral
     private var completion: ((Result<[UInt8], Error>) -> Void)?
     private var commandID: UInt16?
     private var decoder = RaceDecoder()
+    private var writeChunks: [Data] = []
+    private var waitsForReply = true
     private var trace: ((String) -> Void)?
 
     init(productName: String) throws {
@@ -72,17 +74,26 @@ final class BluetoothTransport: NSObject, CBCentralManagerDelegate, CBPeripheral
     }
     private func fail(_ message: String) { finish(.failure(MouseError.message(message))) }
 
-    func exchange(_ request: [UInt8], command: UInt16, trace: ((String) -> Void)?) throws -> [UInt8] {
-        try perform(timeout: 4) {
+    static func chunks(_ request: [UInt8], withResponseLimit: Int, shortWriteLimit: Int) throws -> [Data] {
+        let size = min(59, withResponseLimit, shortWriteLimit)
+        guard size > 0, !request.isEmpty, request.count <= 8204 else { throw MouseError.message("蓝牙命令长度无效") }
+        return stride(from:0,to:request.count,by:size).map { Data(request[$0..<min($0+size,request.count)]) }
+    }
+
+    func exchange(_ request: [UInt8], command: UInt16, trace: ((String) -> Void)?, waitForReply: Bool = true) throws -> [UInt8] {
+        try perform(timeout: 15) {
             guard self.ready, let p = self.peripheral, p.state == .connected, let tx = self.tx else {
                 self.fail("蓝牙鼠标已断开，请重新连接。"); return
             }
-            guard request.count <= p.maximumWriteValueLength(for: .withResponse) else {
-                self.fail("蓝牙命令超过当前传输长度，未发送。"); return
-            }
+            // maximumWriteValueLength(.withResponse) may include ATT long-write
+            // capacity. RACE uses a stream of short characteristic writes instead.
+            do { self.writeChunks = try Self.chunks(request, withResponseLimit:p.maximumWriteValueLength(for:.withResponse), shortWriteLimit:p.maximumWriteValueLength(for:.withoutResponse)) }
+            catch { self.finish(.failure(error)); return }
             self.commandID = command; self.decoder = RaceDecoder(); self.trace = trace
+            self.waitsForReply = waitForReply
+            trace?("BLE CHUNKS \(self.writeChunks.count) MAX \(self.writeChunks.map(\.count).max() ?? 0)")
             trace?("BLE TX " + request.map { String(format: "%02x", $0) }.joined(separator: " "))
-            p.writeValue(Data(request), for: tx, type: .withResponse)
+            p.writeValue(self.writeChunks.removeFirst(), for: tx, type: .withResponse)
         }
     }
 
@@ -147,16 +158,19 @@ final class BluetoothTransport: NSObject, CBCentralManagerDelegate, CBPeripheral
         ready = true; finish(.success([]))
     }
     func peripheral(_ peripheral: CBPeripheral, didWriteValueFor characteristic: CBCharacteristic, error: Error?) {
-        if let error { fail("蓝牙请求发送失败：" + error.localizedDescription) }
+        guard !closed, characteristic.uuid == Self.txID else { return }
+        if let error { fail("蓝牙请求发送失败：" + error.localizedDescription); return }
+        if !writeChunks.isEmpty { peripheral.writeValue(writeChunks.removeFirst(), for: characteristic, type: .withResponse) }
+        else if !waitsForReply { finish(.success([])) }
     }
     func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
-        guard characteristic.uuid == Self.rxID, let commandID else { return }
+        guard characteristic.uuid == Self.rxID, let commandID, waitsForReply else { return }
         if let error { fail("蓝牙读取失败：" + error.localizedDescription); return }
         let bytes = Array(characteristic.value ?? Data())
         trace?("BLE RX " + bytes.map { String(format: "%02x", $0) }.joined(separator: " "))
         for frame in decoder.append(bytes: bytes) where frame.command == commandID {
             guard frame.payload.first == 0 else { fail(String(format: "设备拒绝命令 0x%04x", commandID)); return }
-            if commandID == 0x1c07 && frame.payload.count <= 1 { continue }
+            if (commandID == 0x1c07 || commandID == 0x0a0c) && frame.payload.count <= 1 { continue }
             finish(.success(frame.payload)); return
         }
     }
