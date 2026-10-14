@@ -15,20 +15,34 @@ final class MouseModel: ObservableObject {
     @Published var mappingReceipt: MappingReceipt?
     @Published var mappingPending = false
     @Published var versions: [String: String] = [:]
+    private var observedIdentity: UInt64?
     private let mappingService = MappingService()
     private let service = MouseService()
 
     func refresh() async {
         guard !busy else { return }; busy = true
         defer { busy = false }
+        observedIdentity = await service.connectionIdentity()
         pending = await service.hasPending()
         mappingPending = await mappingService.hasPending()
+        let previousIdentity = snapshot?.deviceIdentity
         do { snapshot = try await service.read(); error = nil }
         catch { self.error = error.localizedDescription; snapshot = nil }
+        if snapshot?.deviceIdentity != previousIdentity {
+            receipt = nil; mappingReceipt = nil; notice = nil; mappingNotice = nil; versions = [:]
+        }
         if snapshot != nil {
             do { mapping = try await mappingService.read(); mappingError = nil }
             catch { mapping = nil; mappingError = error.localizedDescription }
         } else { mapping = nil }
+    }
+    func refreshConnectionIfNeeded() async -> Bool {
+        guard !busy else { return false }
+        let identity = await service.connectionIdentity()
+        guard identity != observedIdentity else { return false }
+        await refresh()
+        await readVersions()
+        return true
     }
     func apply(_ stage: DPIStage, expected: MouseSnapshot) async {
         guard !busy, snapshot != nil else { return }; busy = true
@@ -80,6 +94,7 @@ final class MouseModel: ObservableObject {
         mappingPending = await mappingService.hasPending()
     }
     func readVersions() async {
+        guard snapshot != nil else { versions = [:]; return }
         guard !busy else { return }; busy = true
         defer { busy = false }
         versions = (try? await mappingService.versions()) ?? [:]
@@ -225,9 +240,12 @@ struct RootView: View {
             await model.readVersions()
             updates.setCurrent(model.versions)
             if updates.due { await updates.check(current: model.versions) }
+            var ticks = 0
             while !Task.isCancelled {
-                do { try await Task.sleep(for: .seconds(30)) } catch { break }
-                await model.refresh()
+                do { try await Task.sleep(for: .seconds(2)) } catch { break }
+                ticks += 1
+                if await model.refreshConnectionIfNeeded() { updates.setCurrent(model.versions) }
+                else if ticks % 15 == 0 { await model.refresh() }
                 if updates.due { await model.readVersions(); await updates.check(current: model.versions) }
             }
         }
@@ -266,7 +284,7 @@ struct DeviceStatusBar: View {
             }
             Spacer(minLength: 16)
             VStack(alignment: .trailing, spacing: 7) {
-                Label(model.snapshot?.connection ?? "等待连接", systemImage: "antenna.radiowaves.left.and.right")
+                Label(model.snapshot?.connection ?? "等待连接", systemImage: model.snapshot?.connectionSymbol ?? "antenna.radiowaves.left.and.right")
                 HStack(spacing: 10) {
                     if let date = model.snapshot?.capturedAt {
                         Text("更新于 \(date.formatted(date: .omitted, time: .standard))").monospacedDigit()

@@ -91,7 +91,7 @@ struct ConnectionHelp: View {
             VStack(alignment: .leading, spacing: 16) {
                 Image(systemName: "computermouse").font(.largeTitle).foregroundStyle(.secondary)
                 Text(model.busy ? "正在连接你的鼠标" : "等待你的鼠标").font(.title3.weight(.semibold))
-                Text("插入 2.4G 接收器，移动或点击鼠标将它唤醒。请先退出官方设置程序及网页。")
+                Text("通过 USB 直连、2.4G 接收器，或在 macOS 蓝牙设置中连接鼠标，然后移动鼠标将它唤醒。请先退出官方设置程序及网页。")
                     .font(.callout).foregroundStyle(.secondary)
                 Button("重新连接") { Task { await model.refresh() } }
                     .nativeAction(prominent: true).disabled(model.busy)
@@ -112,6 +112,7 @@ struct DevicePanel: View {
             Section("设备") {
                 LabeledContent("型号", value: "AM Infinity .97")
                 LabeledContent("连接", value: model.snapshot?.connection ?? "未连接")
+                Text("同时连接时优先使用 USB，其次蓝牙，最后是 2.4G 接收器。").font(.caption).foregroundStyle(.secondary)
                 if let snapshot = model.snapshot {
                     LabeledContent("板载配置", value: "配置 \(snapshot.profile + 1)")
                 }
@@ -133,7 +134,7 @@ struct DevicePanel: View {
                     Link("@op7418", destination: URL(string: "https://twitter.com/op7418")!)
                 }
                 DisclosureGroup("支持范围") {
-                    Text("已实机验证 2.4G 的电量、DPI 读取、修改和恢复。USB 直连与蓝牙尚未实测。")
+                    Text("支持蓝牙、USB 直连和 2.4G 接收器。蓝牙首次连接需允许系统蓝牙权限；请先在 macOS 中完成配对。")
                     Text("支持板载按键和常用 Mac 快捷键映射。手势、平滑滚动、灯光和固件刷写尚未加入。")
                 }.foregroundStyle(.secondary)
                 DisclosureGroup("图片来源") {

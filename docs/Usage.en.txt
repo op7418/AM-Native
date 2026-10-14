@@ -1,17 +1,17 @@
-AM Native 0.4.7 — preview for Apple Silicon
+AM Native 0.5.0 — preview for Apple Silicon
 
 Author: 歸藏 (Guizang) · https://twitter.com/op7418
 Source and English README: https://github.com/op7418/AM-Native
 
 1. Unzip and drag AM Native.app to Applications.
 2. The preview is ad-hoc signed, with no Developer ID signature or Apple notarization. If macOS blocks it, confirm the source, try opening it once, then use System Settings > Privacy & Security > Open Anyway. See https://support.apple.com/en-us/102445 .
-3. Quit the official Angry Miao settings app/background process and close its settings webpage. Connect the 2.4 GHz receiver, then move or click the mouse to wake it.
+3. Quit the official Angry Miao settings app/background process and close its settings webpage. Connect via USB, Bluetooth or the 2.4 GHz receiver, then wake the mouse. For Bluetooth, pair and connect in macOS settings first, and allow the app Bluetooth access. USB takes priority over Bluetooth, then the receiver. Switching connections refreshes the app and clears in-memory undo receipts.
 4. Click a mouse hotspot to remap a button. Click DPI at the bottom to change a stage. Click 保存到鼠标 (Save to mouse) to apply; choosing an option alone does not save.
 5. The app backs up before writing and verifies the result by reading it back. Saved onboard settings remain effective after quitting. 撤销 / 撤销映射 restores the previous successful change during the current app session.
 6. 更新 (Updates) checks official mouse/receiver firmware and Mac driver versions; it does not flash, download or install them. Press Command-R to refresh device status.
 
 The interface is currently Chinese. The English README explains each control.
-Apple Silicon only. Declared minimum macOS 14; tested on macOS 27. Other OS versions and direct USB are unverified; Bluetooth is unsupported. Glass styling requires macOS 26+.
+Apple Silicon only. Declared minimum macOS 14; tested on macOS 27. Bluetooth, direct USB and 2.4 GHz have passed hardware read/write/restore tests. Bluetooth and USB also passed app save/undo checks. Other OS versions are unverified. Glass styling requires macOS 26+.
 
 Backups: ~/Library/Application Support/AM Native/Backups/
 If a save fails or recovery is pending, retain the error and backup and report it through GitHub Issues. Include your Mac chip, macOS version, connection method, app version and reproduction steps. Avoid posting private backup data.

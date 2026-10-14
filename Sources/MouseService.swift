@@ -16,6 +16,8 @@ actor MouseService {
     }
     private var pendingURL: URL { Self.backupDirectory.appendingPathComponent("pending.json") }
 
+    func connectionIdentity() -> UInt64? { MouseDevice.currentIdentity() }
+
     func read() throws -> MouseSnapshot { try MouseDevice().snapshot() }
 
     func apply(stage: DPIStage, expected: MouseSnapshot) throws -> ChangeReceipt {

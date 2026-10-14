@@ -33,6 +33,34 @@ struct CoreTests {
         for invalid: [UInt8] in [[0x14,60,128], [0x14,7,128,0], [0x15,0,128]] {
             do { _ = try decoder.append(report: invalid, route: 128); fatalError("Invalid HID accepted") } catch {}
         }
-        print("PASS: real DPI/battery fixtures, all-stage restoration, malformed replies, fragmented replies, route isolation, multiple frames")
+        let completedOperation = BluetoothOperation()
+        try check(completedOperation.complete(.success([1,2,3])))
+        try check(!completedOperation.complete(.success([9])))
+        try check(try completedOperation.wait(timeout: 0) == [1,2,3])
+        let timedOutOperation = BluetoothOperation()
+        do { _ = try timedOutOperation.wait(timeout: 0); fatalError("Missing BLE response accepted") } catch {}
+        try check(!timedOutOperation.complete(.success([9])))
+        // BLE carries raw RACE bytes, including frames split across notifications.
+        var ble = RaceDecoder()
+        try check(ble.append(bytes: Array(frame.prefix(5))).isEmpty)
+        try check(ble.append(bytes: Array(frame.dropFirst(5))).first?.payload == payload)
+        try check(ble.append(bytes: ack + ack).count == 2)
+        func endpoint(_ vendor: Int = 3725, _ product: Int, _ transport: String = "USB", _ page: Int = 0xff13, _ size: Int = 62, _ name: String = "AM Infinity .97") -> MouseInterface {
+            MouseInterface(vendorID: vendor, productID: product, productName: name, transport: transport, usagePage: page, featureSize: size)
+        }
+        let dongle = endpoint(3725, 1795), usb = endpoint(3725, 2176)
+        let bluetooth = endpoint(328, 0, "Bluetooth Low Energy", 12, 1)
+        try check(try MouseInterface.select([dongle, bluetooth]) == 1)
+        try check(try MouseInterface.select([bluetooth, dongle, usb]) == 2)
+        try check(endpoint(13729, 53).connection == .usb)
+        try check(endpoint(3725, 1795, "Bluetooth Low Energy").connection == nil)
+        try check(endpoint(328, 0, "Bluetooth Low Energy", 12, 1, "Other mouse").connection == nil)
+        try check(endpoint(3725, 2176, "USB", 1).connection == nil)
+        try check(endpoint(3725, 2176, "USB", 0xff13, 64).connection == nil)
+        try check(MouseConnection.usb.route == 0 && MouseConnection.bluetooth.route == 0 && MouseConnection.receiver.route == 128)
+        for ambiguous in [[usb, usb], [bluetooth, bluetooth], [dongle, dongle], []] {
+            do { _ = try MouseInterface.select(ambiguous); fatalError("Ambiguous/missing interface accepted") } catch {}
+        }
+        print("PASS: real DPI/battery fixtures, all-stage restoration, malformed replies, fragmented replies, route isolation, multiple frames, BLE fragmentation, connection precedence and ambiguity")
     }
 }

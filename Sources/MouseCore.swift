@@ -66,7 +66,10 @@ struct RaceDecoder {
         let size = Int(report[1])
         guard size <= 59, report.count >= size + 3 else { throw MouseError.message("HID 长度无效") }
         guard report[2] == route, size > 0 else { return [] }
-        buffer += report[3..<(size + 3)]
+        return append(bytes: Array(report[3..<(size + 3)]))
+    }
+    mutating func append(bytes: [UInt8]) -> [RaceFrame] {
+        buffer += bytes
         var frames: [RaceFrame] = []
         while buffer.count >= 6 {
             guard (buffer[0] == 5 || buffer[0] == 21), [0x5b, 0x5d].contains(buffer[1]) else {
@@ -87,38 +90,99 @@ struct MouseSnapshot: Codable, Sendable {
     let productID: Int
     let deviceIdentity: UInt64
     let connection: String
+    var connectionSymbol: String {
+        switch connection {
+        case MouseConnection.usb.rawValue: "cable.connector"
+        case MouseConnection.bluetooth.rawValue: "wave.3.right"
+        default: "antenna.radiowaves.left.and.right"
+        }
+    }
     let profile: Int
     let battery: BatteryState
     let dpi: DPIState
 }
 
+enum MouseConnection: String, Codable {
+    case usb = "USB 直连", bluetooth = "蓝牙", receiver = "2.4 GHz 接收器"
+    var priority: Int { switch self { case .usb: 0; case .bluetooth: 1; case .receiver: 2 } }
+    var route: UInt8 { self == .receiver ? 0x80 : 0 }
+}
+
+struct MouseInterface {
+    let vendorID: Int
+    let productID: Int
+    let productName: String
+    let transport: String
+    let usagePage: Int
+    let featureSize: Int
+    var connection: MouseConnection? {
+        if transport == "Bluetooth Low Energy", vendorID == 328, productID == 0,
+           productName == "AM Infinity .97", usagePage == 12 { return .bluetooth }
+        guard transport == "USB", usagePage == 0xff13, featureSize == 62 else { return nil }
+        if vendorID == 3725 && productID == 1795 { return .receiver }
+        if (vendorID == 3725 && productID == 2176) || (vendorID == 13729 && productID == 53) { return .usb }
+        return nil
+    }
+    static func select(_ interfaces: [MouseInterface]) throws -> Int {
+        let supported = interfaces.indices.filter { interfaces[$0].connection != nil }
+        guard let priority = supported.map({ interfaces[$0].connection!.priority }).min() else {
+            throw MouseError.message("未找到 AM Infinity .97。请连接 USB、2.4G 接收器，或在系统蓝牙设置中连接鼠标。")
+        }
+        let preferred = supported.filter { interfaces[$0].connection!.priority == priority }
+        guard preferred.count == 1 else { throw MouseError.message("检测到多只相同连接方式的鼠标，请只保留一只连接。") }
+        return preferred[0]
+    }
+}
+
 // Use only on one serial worker. No device seizure, event tap, helper, or network.
 final class MouseDevice {
     private let manager: IOHIDManager
-    private let device: IOHIDDevice
+    private var device: IOHIDDevice?
+    private var bluetooth: BluetoothTransport?
+    let connectionKind: MouseConnection
     let productID: Int
     let identity: UInt64
     let route: UInt8
-    var connection: String { productID == 1795 ? "2.4 GHz 接收器" : "USB" }
+    var connection: String { connectionKind.rawValue }
     var trace: ((String) -> Void)?
     private var lockFD: Int32 = -1
 
+    private static func discover() -> (IOHIDManager, [IOHIDDevice], [MouseInterface]) {
+        let manager = IOHIDManagerCreate(kCFAllocatorDefault, 0)
+        IOHIDManagerSetDeviceMatchingMultiple(manager, [
+            [kIOHIDVendorIDKey: 3725], [kIOHIDVendorIDKey: 13729],
+            [kIOHIDVendorIDKey: 328, kIOHIDProductIDKey: 0]
+        ] as CFArray)
+        let candidates = Array(IOHIDManagerCopyDevices(manager) as? Set<IOHIDDevice> ?? [])
+        let interfaces = candidates.map { d in
+            MouseInterface(vendorID: Self.property(d, kIOHIDVendorIDKey), productID: Self.property(d, kIOHIDProductIDKey),
+                productName: IOHIDDeviceGetProperty(d, kIOHIDProductKey as CFString) as? String ?? "",
+                transport: IOHIDDeviceGetProperty(d, kIOHIDTransportKey as CFString) as? String ?? "",
+                usagePage: Self.property(d, kIOHIDPrimaryUsagePageKey), featureSize: Self.property(d, kIOHIDMaxFeatureReportSizeKey))
+        }
+        return (manager, candidates, interfaces)
+    }
+
+    static func currentIdentity() -> UInt64? {
+        let (manager, devices, interfaces) = discover()
+        defer { _ = manager }
+        guard let index = try? MouseInterface.select(interfaces) else { return nil }
+        var identity: UInt64 = 0
+        IORegistryEntryGetRegistryEntryID(IOHIDDeviceGetService(devices[index]), &identity)
+        return identity
+    }
+
     init() throws {
-        manager = IOHIDManagerCreate(kCFAllocatorDefault, 0)
-        IOHIDManagerSetDeviceMatching(manager, [kIOHIDVendorIDKey: 3725, kIOHIDPrimaryUsagePageKey: 0xff13] as CFDictionary)
-        let candidates = (IOHIDManagerCopyDevices(manager) as? Set<IOHIDDevice> ?? []).filter {
-            [1795, 2176].contains(Self.property($0, kIOHIDProductIDKey))
-        }
-        guard candidates.count == 1, let selected = candidates.first else {
-            throw MouseError.message(candidates.isEmpty ? "未找到 AM Infinity .97。请连接 2.4G 接收器并唤醒鼠标。" : "检测到多个配置接口，请只保留接收器或 USB 直连中的一种。")
-        }
-        device = selected
-        productID = Self.property(selected, kIOHIDProductIDKey)
-        route = productID == 1795 ? 0x80 : 0
+        let discovery = Self.discover()
+        manager = discovery.0
+        let candidates = discovery.1, interfaces = discovery.2
+        let index = try MouseInterface.select(interfaces), selected = candidates[index]
+        connectionKind = interfaces[index].connection!
+        productID = interfaces[index].productID
+        route = connectionKind.route
         var registryID: UInt64 = 0
         IORegistryEntryGetRegistryEntryID(IOHIDDeviceGetService(selected), &registryID)
         identity = registryID
-        guard Self.property(selected, kIOHIDMaxFeatureReportSizeKey) == 62 else { throw MouseError.message("设备报告布局未经验证") }
         let lockURL = FileManager.default.temporaryDirectory.appendingPathComponent("am-native-hid-\(getuid()).lock")
         lockFD = Darwin.open(lockURL.path, O_CREAT | O_RDWR | O_NOFOLLOW, S_IRUSR | S_IWUSR)
         guard lockFD >= 0 else { throw MouseError.message("无法建立通信锁") }
@@ -126,13 +190,23 @@ final class MouseDevice {
             Darwin.close(lockFD); lockFD = -1
             throw MouseError.message("另一份 AM Native 正在使用设备，请稍后重试")
         }
-        let code = IOHIDDeviceOpen(selected, 0)
-        guard code == kIOReturnSuccess else {
-            Darwin.close(lockFD); lockFD = -1
-            throw MouseError.message(String(format: "无法打开鼠标接口（0x%08x）。请退出官方驱动及其网页后重试。", code))
-        }
+        do {
+            if connectionKind == .bluetooth {
+                bluetooth = try BluetoothTransport(productName: interfaces[index].productName)
+            } else {
+                let code = IOHIDDeviceOpen(selected, 0)
+                guard code == kIOReturnSuccess else {
+                    throw MouseError.message(String(format: "无法打开鼠标接口（0x%08x）。请退出官方驱动及其网页后重试。", code))
+                }
+                device = selected
+            }
+        } catch { Darwin.close(lockFD); lockFD = -1; throw error }
     }
-    deinit { IOHIDDeviceClose(device, 0); if lockFD >= 0 { Darwin.close(lockFD) } }
+    deinit {
+        bluetooth?.close()
+        if let device { IOHIDDeviceClose(device, 0) }
+        if lockFD >= 0 { Darwin.close(lockFD) }
+    }
     private static func property(_ d: IOHIDDevice, _ key: String) -> Int {
         (IOHIDDeviceGetProperty(d, key as CFString) as? NSNumber)?.intValue ?? 0
     }
@@ -143,6 +217,11 @@ final class MouseDevice {
         guard routeOverride == nil || (command == 0x1c07 && [UInt8(0), 0x80].contains(routeOverride!)) else { throw MouseError.message("不允许覆盖写入路由") }
         let route = routeOverride ?? self.route
         let race: [UInt8] = [5, 0x5a] + littleEndian(payload.count + 2) + littleEndian(Int(command)) + payload
+        if let bluetooth {
+            guard routeOverride == nil || routeOverride == 0 else { throw MouseError.message("蓝牙不支持接收器路由") }
+            return try bluetooth.exchange(race, command: command, trace: trace)
+        }
+        guard let device else { throw MouseError.message("鼠标已断开") }
         guard race.count <= 59 else { throw MouseError.message("命令过长") }
         var report = [UInt8(0x14), UInt8(race.count), route] + race
         report += Array(repeating: 0, count: 62 - report.count)

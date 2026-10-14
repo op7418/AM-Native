@@ -6,16 +6,16 @@
 
 A native macOS settings app for the **Angry Miao AM Infinity .97**. Read battery status, adjust DPI and remap onboard buttons for everyday Mac use.
 
-Built with SwiftUI, AppKit and direct IOKit HID communication. The official settings app does not need to run. The current app interface is in Chinese; this README is the English guide.
+Built with SwiftUI, AppKit and direct IOKit HID / CoreBluetooth communication. The official settings app does not need to run. The current app interface is in Chinese; this README is the English guide.
 
 ## Download and install
 
-**[Download the latest preview for Apple Silicon](https://github.com/op7418/AM-Native/releases/tag/v0.4.7)**
+**[Download the latest preview for Apple Silicon](https://github.com/op7418/AM-Native/releases/tag/v0.5.0)**
 
 1. Download `AMNative-VERSION-arm64-preview.zip` from the release and unzip it.
 2. Drag `AM Native.app` into Applications and open it.
 3. Quit the official Angry Miao app/background process and close its mouse settings webpage.
-4. Connect the **2.4 GHz receiver** and move or click the mouse to wake it. Wait for the connected status.
+4. Connect over **USB, Bluetooth or the 2.4 GHz receiver** and wake the mouse. For Bluetooth, first pair and connect it in macOS settings, then allow AM Native Bluetooth access when prompted. Wait for the connected status.
 
 ### macOS cannot verify the developer
 
@@ -31,7 +31,7 @@ After confirming that the download came from this repository's release, try open
 | macOS | Declared minimum: 14; tested on macOS 27; macOS 14–26 have not been tested on hardware |
 | Glass appearance | macOS 26 or later; compatibility styling on older systems |
 | Mouse | AM Infinity .97; other models have not been verified |
-| Connection | 2.4 GHz receiver verified; direct USB untested; Bluetooth unsupported |
+| Connection | Bluetooth, direct USB and the 2.4 GHz receiver verified with hardware read/write/restore tests |
 
 ## Using the app
 
@@ -55,6 +55,8 @@ The black/white selector changes the illustration only. It does not detect the h
 **Backups:** `~/Library/Application Support/AM Native/Backups/`, also accessible from Device information. Files persist across launches; the normal undo history is limited to the current session. If the app reports a pending recovery, keep the message and backup, and use the recovery control shown in the app.
 
 **Receiver connected but mouse unavailable:** wake the physical mouse, quit official settings software and webpages, then press `⌘R`. Run only one copy of AM Native.
+
+**Switching connections:** USB takes precedence over Bluetooth, then the 2.4 GHz receiver. The app refreshes automatically after switching; `⌘R` also refreshes. Bluetooth uses an already paired and connected AM Infinity .97; it does not scan or pair other devices. If access was denied, allow AM Native in System Settings → Privacy & Security → Bluetooth. Switching connections clears in-memory undo receipts; reread the settings before editing.
 
 **Official updates:** while running, the app checks once a day for mouse firmware, receiver firmware and the official Mac driver. Manual checks are available. It only reports versions and links to official pages; it does not download, install or flash them. This is not an auto-updater for AM Native itself.
 

@@ -9,14 +9,14 @@ if [[ ! -f Resources/am-infinity.png || ! -f Resources/am-infinity-black.png ]];
 fi
 mkdir -p build/cache "build/AM Native.app/Contents/MacOS"
 FLAGS=(-swift-version 5 -target arm64-apple-macosx14.0 -sdk "$SDK" -module-cache-path "$PWD/build/cache")
-"$SWIFTC" "${FLAGS[@]}" Sources/MouseCore.swift Tests/CoreTests.swift -o build/core-tests
+"$SWIFTC" "${FLAGS[@]}" Sources/MouseCore.swift Sources/BluetoothTransport.swift Tests/CoreTests.swift -o build/core-tests
 build/core-tests
-"$SWIFTC" "${FLAGS[@]}" Sources/MouseCore.swift Sources/MouseService.swift Sources/KeyMapping.swift Sources/OfficialUpdates.swift Tests/FeatureTests.swift -o build/feature-tests
+"$SWIFTC" "${FLAGS[@]}" Sources/MouseCore.swift Sources/BluetoothTransport.swift Sources/MouseService.swift Sources/KeyMapping.swift Sources/OfficialUpdates.swift Tests/FeatureTests.swift -o build/feature-tests
 build/feature-tests
 "$SWIFTC" "${FLAGS[@]}" Sources/MacNavigationButton.swift Tests/NavigationTests.swift -o build/navigation-tests
 build/navigation-tests
-"$SWIFTC" "${FLAGS[@]}" Sources/MouseCore.swift Sources/Probe.swift -o build/am-probe
-"$SWIFTC" "${FLAGS[@]}" Sources/MouseCore.swift Sources/MouseService.swift Sources/KeyMapping.swift Sources/OfficialUpdates.swift Sources/UpdatePanel.swift Sources/MappingPanel.swift Sources/InteractiveMouse.swift Sources/MacNavigationButton.swift Sources/NativeStyle.swift Sources/DeviceWorkspace.swift Sources/PointerView.swift Sources/AMNativeApp.swift -o "build/AM Native.app/Contents/MacOS/AMNative"
+"$SWIFTC" "${FLAGS[@]}" Sources/MouseCore.swift Sources/BluetoothTransport.swift Sources/Probe.swift -o build/am-probe
+"$SWIFTC" "${FLAGS[@]}" Sources/MouseCore.swift Sources/BluetoothTransport.swift Sources/MouseService.swift Sources/KeyMapping.swift Sources/OfficialUpdates.swift Sources/UpdatePanel.swift Sources/MappingPanel.swift Sources/InteractiveMouse.swift Sources/MacNavigationButton.swift Sources/NativeStyle.swift Sources/DeviceWorkspace.swift Sources/PointerView.swift Sources/AMNativeApp.swift -o "build/AM Native.app/Contents/MacOS/AMNative"
 mkdir -p "build/AM Native.app/Contents/Resources"
 cp Resources/am-infinity.png Resources/am-infinity-black.png "build/AM Native.app/Contents/Resources/"
 # Use the release artwork when present; a fresh source clone has a generated fallback.
