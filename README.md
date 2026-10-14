@@ -1,6 +1,6 @@
 # AM Native
 
-<!-- User-supplied application screenshot will be inserted here. -->
+![AM Native：鼠标按键映射界面](docs/images/am-native-screenshot.jpeg)
 
 **中文** · [English](README.en.md)
 

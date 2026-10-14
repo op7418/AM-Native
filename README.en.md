@@ -1,6 +1,6 @@
 # AM Native
 
-<!-- User-supplied application screenshot will be inserted here. -->
+![AM Native mouse button mapping interface](docs/images/am-native-screenshot.jpeg)
 
 [中文](README.md) · **English**
 

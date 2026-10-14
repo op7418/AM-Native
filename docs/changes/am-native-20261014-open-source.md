@@ -10,3 +10,5 @@ This public snapshot contains application source, offline tests, reproducible bu
 Validation: clean checkout artwork fetch, fallback-icon build, existing protocol/mapping/native-control tests and strict code signature pass. The branded release build also passes; release ZIP contents and extracted signature verified. This remains an arm64 preview with ad-hoc signing and no Apple notarization. No hardware writes were performed for this release. The owner-supplied screenshot is pending and will be added at the beginning of both READMEs when received.
 
 Installed 0.4.7 About page verified live: author 歸藏 and Twitter @op7418 link are present. The existing 0.4.6 installation was backed up before replacement. Preview download links target the explicit prerelease tag.
+
+Follow-up: the owner supplied the screenshot; it is now included in both READMEs. See [screenshot publication record](am-native-20261014-readme-screenshot.md).
