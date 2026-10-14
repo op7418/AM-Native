@@ -1,0 +1,6 @@
+build/
+dist/
+evidence/
+.DS_Store
+Resources/*.png
+Resources/*.icns
