@@ -7,8 +7,8 @@
 <key>CFBundleExecutable</key><string>AMNative</string>
 <key>CFBundleIconFile</key><string>AppIcon.icns</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>0.6.0</string>
-<key>CFBundleVersion</key><string>14</string>
+<key>CFBundleShortVersionString</key><string>0.6.1</string>
+<key>CFBundleVersion</key><string>15</string>
 <key>LSMinimumSystemVersion</key><string>14.0</string>
 <key>NSBluetoothAlwaysUsageDescription</key><string>连接已配对的怒喵鼠标，读取电量、DPI，保存按键和光效设置。</string>
 <key>NSHighResolutionCapable</key><true/>

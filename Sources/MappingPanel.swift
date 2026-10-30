@@ -14,6 +14,10 @@ struct MappingPanel: View {
                         .font(.title3.weight(.semibold)).accessibilityIdentifier("mapping-heading")
                     Text("选择此键的操作，保存后退出 App 仍有效。快捷键使用 Mac 默认组合；至少保留一个左键点击。")
                         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    if ["desktopPrevious", "desktopNext"].contains(draft?.actionID ?? "") {
+                        Text("直接切到相邻桌面，无需打开调度中心。请在系统设置 → 键盘 → 键盘快捷键 → 调度中心中启用对应的 Control + 方向键快捷键。")
+                            .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    }
                     if [.middle, .scrollUp, .scrollDown].contains(control) {
                         Picker("滚轮动作", selection: Binding(get: { control }, set: selectControl)) {
                             Text("点击").tag(MouseControl.middle)

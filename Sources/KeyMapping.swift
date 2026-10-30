@@ -48,6 +48,8 @@ struct MappingAction: Identifiable, Equatable {
         .init(id: "undo", title: "撤销 · ⌘Z", type: 6, params: [0,0,29,8]),
         .init(id: "redo", title: "重做 · ⇧⌘Z", type: 6, params: [0,0,29,10]),
         .init(id: "mission", title: "调度中心 · ⌃↑", type: 6, params: [0,0,82,1]),
+        .init(id: "desktopPrevious", title: "上一个桌面 · ⌃←", type: 6, params: [0,0,80,1]),
+        .init(id: "desktopNext", title: "下一个桌面 · ⌃→", type: 6, params: [0,0,79,1]),
         .init(id: "spotlight", title: "聚焦搜索 · ⌘空格", type: 6, params: [0,0,44,8]),
         .init(id: "tab", title: "切换应用 · ⌘Tab", type: 6, params: [0,0,43,8]),
         .init(id: "play", title: "播放 / 暂停", type: 6, params: [205,0,0,0]),
